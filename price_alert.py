@@ -15,12 +15,9 @@ import time
 from win10toast import ToastNotifier
 
 
-def check_for_warning(name, price, sheet, condition=None, threshold=None, direction=None, sl=None, tp=None, last_push=None):
+def check_for_warning(name, price, sheet, condition=None, threshold=None, direction=None, sl=None, tp=None):
     toaster = ToastNotifier()
     trigger = False
-    message = None
-
-    threshold_hours = 1
 
     if sheet == 'Alert':
         if condition == '>' and price >= threshold:
@@ -46,7 +43,7 @@ def check_for_warning(name, price, sheet, condition=None, threshold=None, direct
                 sltp_type = 'Take-Profit'
 
         if trigger:
-            message = str(name) + ' triggered a ' + str(sltp_type) + ' Alert! Price: ' + str(price)
+            message = str(name) + ' triggered a' + str(sltp_type) + ' Alert! Price: ' + str(price)
 
     elif sheet == 'Options':
         if direction == 'call':
@@ -59,10 +56,8 @@ def check_for_warning(name, price, sheet, condition=None, threshold=None, direct
         message = 'Option ' + str(name) + ' triggered a SL-Alert! Price: ' + str(price)
 
     if trigger:
-        toaster.show_toast('Finance', message, duration=999999, icon_path='stocks.ico', threaded=True)
-        if last_push + dt.timedelta(hours=threshold_hours) <= dt.datetime.now():
-            url = 'https://www.pushsafer.com/api?k=vLnoDWjGWkYYYPiwBqaH&d=19518&i=9&c=%239900ff&v=1&pr=2&t=' + 'Price Alert' + '&m=' + str(message)
-            last_pushsafer = dt.datetime.now()
+        toaster.show_toast('Finance', message, duration=999999, icon_path='stocks.ico', threaded=False)
+        url = 'https://www.pushsafer.com/api?k=vLnoDWjGWkYYYPiwBqaH&d=19518&i=9&c=%239900ff&v=1&pr=2&t=' + 'Price Alert' + '&m=' + str(message)
         requests.get(url)
 
 
@@ -75,11 +70,11 @@ def save_sheet(wb):
 
 def update_data(sleep_time=600, show_tray=True, local_timezone='Europe/Berlin'):
 
-    last_push = dt.datetime.strptime('01.01.2000', '%d.%m.%Y')
-
     if show_tray:
         thread = threading.Thread(target=tray_icon_handler, name='Price Alert Tray')
         thread.start()
+
+
 
     sheets = ['Alert', 'SLTP', 'Change', 'Options', 'Calendar']
     change_times = {'1 week': 7, '1 month': 30, '1 quarter': 90, '1 year': 360}
@@ -114,9 +109,9 @@ def update_data(sleep_time=600, show_tray=True, local_timezone='Europe/Berlin'):
                             update_time.append(dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
                             if name == 'Alert':
-                                check_for_warning(name=row[1]['Name'], price=round(request['Close'][-1], 2), sheet=name, condition=row[1]['Condition'], threshold=row[1]['Threshold'], last_push=last_push)
+                                check_for_warning(name=row[1]['Name'], price=round(request['Close'][-1], 2), sheet=name, condition=row[1]['Condition'], threshold=row[1]['Threshold'])
                             elif name == 'SLTP':
-                                check_for_warning(name=row[1]['Name'], price=round(request['Close'][-1], 2), sheet=name, direction=row[1]['Direction'], sl=row[1]['SL'], tp=row[1]['TP'], last_push=last_push)
+                                check_for_warning(name=row[1]['Name'], price=round(request['Close'][-1], 2), sheet=name, direction=row[1]['Direction'], sl=row[1]['SL'], tp=row[1]['TP'])
 
                         df['Last Update'] = update_time
                         df['Price'] = prices
@@ -158,7 +153,7 @@ def update_data(sleep_time=600, show_tray=True, local_timezone='Europe/Berlin'):
                             prices.append(round(price, 2))
                             update_time.append(dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-                            check_for_warning(name=row[1]['Name'], price=price, sheet=name, condition=row[1]['Type'], threshold=row[1]['SL'], last_push=last_push)
+                            check_for_warning(name=row[1]['Name'], price=price, sheet=name, condition=row[1]['Type'], threshold=row[1]['SL'])
 
                         df['Last Update'] = update_time
                         df['Price'] = prices
@@ -224,7 +219,7 @@ def update_data(sleep_time=600, show_tray=True, local_timezone='Europe/Berlin'):
             last_update.setText('Last update: ' + str(dt.datetime.now().strftime("%H:%M")))
 
         print(str(dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + ' Update done!')
-        time.sleep(int(sleep_time))
+        time.sleep(sleep_time)
         # app.exit()
 
 
@@ -252,12 +247,14 @@ def tray_icon_handler():
 
 
 def startup():
+
     config = configparser.ConfigParser()
     config.read(os.getcwd() + '\\' + 'config.ini')
 
     sleep_time = config['General Settings']['sleep_time']
     show_tray = config['General Settings'].getboolean('show_tray')
     local_timezone = config['Calendar']['local_timezone']
+
 
     update_data(sleep_time, show_tray, local_timezone)
 
